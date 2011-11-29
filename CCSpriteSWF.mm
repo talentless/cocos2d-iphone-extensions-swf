@@ -145,7 +145,6 @@
     projection = director.projection;
     [director setProjection:kCCDirectorProjection2D];
     
-    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnableClientState(GL_VERTEX_ARRAY);
     
@@ -157,6 +156,8 @@
     } else {
         swf_->drawFrame(frame_);
     }
+    
+    glBlendFunc(CC_BLEND_SRC, CC_BLEND_DST);
     
     [director setProjection:projection];
     
@@ -211,6 +212,8 @@
     }
     
     glPopMatrix();
+    
+    glBlendFunc(CC_BLEND_SRC, CC_BLEND_DST);
     
     glEnable(GL_TEXTURE_2D);
     glEnableClientState(GL_VERTEX_ARRAY);
