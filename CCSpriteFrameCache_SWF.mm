@@ -62,7 +62,6 @@
         projection = director.projection;
         [director setProjection:kCCDirectorProjection2D];
         
-        glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnableClientState(GL_VERTEX_ARRAY);
         
@@ -70,6 +69,8 @@
         vgScale(CC_CONTENT_SCALE_FACTOR() * 1.0f,
                 CC_CONTENT_SCALE_FACTOR() * 1.0f);
         swf_->drawFrame(i);
+        
+        glBlendFunc(CC_BLEND_SRC, CC_BLEND_DST);
         
         [director setProjection:projection];
         
