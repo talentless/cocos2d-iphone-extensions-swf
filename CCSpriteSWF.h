@@ -60,3 +60,9 @@
 -(CCTexture2D*) convertToTexture;
 
 @end
+
+@interface CCTexture2D (withName)
+
+-(id) initWithTextureName:(GLuint)textureName pixelFormat:(CCTexture2DPixelFormat)pixelFormat pixelsWide:(NSUInteger)width pixelsHigh:(NSUInteger)height contentSize:(CGSize)size;
+
+@end

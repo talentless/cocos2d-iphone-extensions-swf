@@ -9,6 +9,18 @@
 #include <vg/openvg.h>
 #include <vg/vgu.h>
 #import "CCSpriteSWF.h"
+//#include <vg/vgext.h>
+
+unsigned long ccNextPOT(unsigned long x)
+{
+    x = x - 1;
+    x = x | (x >> 1);
+    x = x | (x >> 2);
+    x = x | (x >> 4);
+    x = x | (x >> 8);
+    x = x | (x >>16);
+    return x + 1;
+}
 
 @implementation CCSpriteSWF
 
@@ -69,6 +81,7 @@
         frame_ = 0; // default
         spriteIdx_ = -1; // show the movie rather than a specific sprite
         swfSprite_ = nil;
+        vgCreateContextSH(480, 320);
     }
     return self;
 }
@@ -130,45 +143,102 @@
 #pragma mark CCSpriteSWF - conversions
 
 -(CCSprite*) convertToSprite {
-    int width = swf_->getFrameWidth();
-    int height = swf_->getFrameHeight();
+    return [CCSprite spriteWithTexture:[self convertToTexture]];
+}
+
+-(CCTexture2D*) convertToTexture {
+    int w = swf_->getFrameWidth();
+    int h = swf_->getFrameHeight();
     
-    CCRenderTexture * rt = [CCRenderTexture renderTextureWithWidth:width height:height];
-    // clear the texture
-    [rt begin];
+    w *= CC_CONTENT_SCALE_FACTOR();
+    h *= CC_CONTENT_SCALE_FACTOR();
     
+    // screen fbo
+	GLint				oldFBO_;
+    
+    // new fbo
+    GLuint			fbo_;
+	GLuint colorbuffer_;
+    
+    // multisampling buffers
+	GLuint msaaFramebuffer_;
+	GLuint msaaColorbuffer_;
+    
+    
+    GLenum				pixelFormat_;
+	CCTexture2D*		texture_;
+    
+    glGetIntegerv(CC_GL_FRAMEBUFFER_BINDING, &oldFBO_);
+    
+    NSUInteger powW = ccNextPOT(w);
+    NSUInteger powH = ccNextPOT(h);
+    
+	GLuint						name_; // texture name
+    
+    glGenTextures(1, &name_);
+    glBindTexture(GL_TEXTURE_2D, name_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) powW, (GLsizei) powH, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);//data);
+    
+    // create texture
+    texture_ = [[CCTexture2D alloc] initWithTextureName:name_ pixelFormat:kCCTexture2DPixelFormat_RGBA8888
+                                             pixelsWide:powW pixelsHigh:powH contentSize:CGSizeMake(w, h)];
+    
+    [texture_ setAliasTexParameters];
+    
+    // generate FBO
+    ccglGenFramebuffers(1, &fbo_);
+    ccglBindFramebuffer(CC_GL_FRAMEBUFFER, fbo_);
+    
+    // associate texture with FBO
+    ccglFramebufferTexture2D(CC_GL_FRAMEBUFFER, CC_GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, name_, 0);
+    
+    GLuint status = ccglCheckFramebufferStatus(CC_GL_FRAMEBUFFER);
+    if (status != CC_GL_FRAMEBUFFER_COMPLETE)
+    {
+        [NSException raise:@"Render Texture" format:@"Could not attach texture to framebuffer"];
+    }
+    
+    /* Create the MSAA framebuffer (offscreen) */
+    glGenFramebuffersOES(1, &msaaFramebuffer_);
+    glBindFramebufferOES(GL_FRAMEBUFFER_OES, msaaFramebuffer_);
+    
+    glGenRenderbuffersOES(1, &msaaColorbuffer_); // render buffer for color
+    glBindRenderbufferOES(GL_RENDERBUFFER_OES, msaaColorbuffer_);
+    glRenderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER_OES, 4, GL_RGBA8_OES, powW, powH);
+    glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES, GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, msaaColorbuffer_);
+    
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER) ;
+    if(status != GL_FRAMEBUFFER_COMPLETE) {
+        NSLog(@"failed to make complete framebuffer object %x", status);
+    }
+    
+    glBindFramebufferOES(GL_FRAMEBUFFER_OES, msaaFramebuffer_);
+    //*/
     // draw the swf
-    CCDirector *director;
-    director = [CCDirector sharedDirector];
     
-    ccDirectorProjection projection;
-    projection = director.projection;
-    [director setProjection:kCCDirectorProjection2D];
+    glPushMatrix();
     
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    
-    vgLoadIdentity();
-    vgScale(CC_CONTENT_SCALE_FACTOR() * 1.0f,
-            CC_CONTENT_SCALE_FACTOR() * 1.0f);
     if (swfSprite_) {
         swfSprite_->draw(frame_);
     } else {
         swf_->drawFrame(frame_);
     }
+    glPopMatrix();
     
-    glBlendFunc(CC_BLEND_SRC, CC_BLEND_DST);
+    ccglBindFramebuffer(CC_GL_FRAMEBUFFER, fbo_);
+    glBindFramebufferOES( GL_READ_FRAMEBUFFER_APPLE, msaaFramebuffer_ );
+    glResolveMultisampleFramebufferAPPLE();
     
-    [director setProjection:projection];
+    GLenum attachments[] = {GL_DEPTH_ATTACHMENT_OES, GL_COLOR_ATTACHMENT0_OES, GL_STENCIL_ATTACHMENT_OES};
+    glDiscardFramebufferEXT(GL_READ_FRAMEBUFFER_APPLE, 3, attachments);
     
-    // close out
-    [rt end];
+	ccglBindFramebuffer(CC_GL_FRAMEBUFFER, oldFBO_);
     
-    return rt.sprite;
-}
-
--(CCTexture2D*) convertToTexture {
-    return [[self convertToSprite] texture];
+    ccglDeleteFramebuffers(1, &fbo_);
+    ccglDeleteFramebuffers(1, &msaaFramebuffer_);
+    glDeleteRenderbuffersOES(1, &msaaColorbuffer_);
+    
+    return texture_;
 }
 
 #pragma mark CCSpriteSWF - draw
@@ -195,13 +265,13 @@
     
     vgLoadIdentity();
     
-    float sx, sy;
-    if (flipX_) { sx = -1.0f; } else { sx = 1.0f; }
-    if (flipY_) { sy = 1.0f; } else { sy = -1.0f; }
+    float sfx, sfy;
+    if (flipX_) { sfx = -1.0f; } else { sfx = 1.0f; }
+    if (flipY_) { sfy = 1.0f; } else { sfy = -1.0f; }
     
     vgTranslate(self.swf->getFrameWidth() * self.anchorPoint.x * -1.0f,
                 self.swf->getFrameHeight() * self.anchorPoint.y * -1.0f);
-    vgScale(self.scaleX * CC_CONTENT_SCALE_FACTOR() * sx, self.scaleY * CC_CONTENT_SCALE_FACTOR() * sy);
+    vgScale(self.scaleX * CC_CONTENT_SCALE_FACTOR() * sfx, self.scaleY * CC_CONTENT_SCALE_FACTOR() * sfy);
     vgRotate(self.rotation * -1.0f);
     vgTranslate(self.positionInPixels.x, self.positionInPixels.y);
     
@@ -229,5 +299,30 @@
     delete swf_;
     [super dealloc];
 }
+
+@end
+
+
+#pragma mark CCTexture2D - withName
+
+@implementation CCTexture2D (withName)
+
+-(id) initWithTextureName:(GLuint)textureName pixelFormat:(CCTexture2DPixelFormat)pixelFormat pixelsWide:(NSUInteger)width pixelsHigh:(NSUInteger)height contentSize:(CGSize)size {
+    if ((self = [super init]) ) {
+        name_ = textureName;
+        
+        size_ = size;
+        width_ = width;
+        height_ = height;
+        maxS_ = size.width / (float)width;
+        maxT_ = size.height / (float)height;
+        
+        hasPremultipliedAlpha_ = YES;
+        
+        resolutionType_ = kCCResolutionUnknown;
+    }
+    return self;
+}
+
 
 @end
