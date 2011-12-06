@@ -1,6 +1,6 @@
 //
 //  CCSpriteSWF.m
-//  MySampleApp
+//  CCSpriteFrameCache_SWF_Extension
 //
 //  Created by Salvatore Gionfriddo on 11/29/11.
 //  Copyright (c) 2011 Taco Graveyard. All rights reserved.
@@ -9,7 +9,7 @@
 #include <vg/openvg.h>
 #include <vg/vgu.h>
 #import "CCSpriteSWF.h"
-//#include <vg/vgext.h>
+#import "CCRenderMultisampledTexture.h"
 
 unsigned long ccNextPOT(unsigned long x)
 {
@@ -147,95 +147,20 @@ unsigned long ccNextPOT(unsigned long x)
 }
 
 -(CCTexture2D*) renderToTexture {
-    int w = swf_->getFrameWidth();
-    int h = swf_->getFrameHeight();
+    CCRenderMultisampledTexture * rt = [CCRenderMultisampledTexture renderTextureWithWidth:swf_->getFrameWidth()
+                                                                                    height:swf_->getFrameHeight()];
     
-    w *= CC_CONTENT_SCALE_FACTOR();
-    h *= CC_CONTENT_SCALE_FACTOR();
-    
-    // screen fbo
-	GLint				oldFBO_;
-    
-    // new fbo
-    GLuint			fbo_;
-    
-    // multisampling buffers
-	GLuint msaaFramebuffer_;
-	GLuint msaaColorbuffer_;
-    
-	CCTexture2D*		texture_;
-    
-    glGetIntegerv(CC_GL_FRAMEBUFFER_BINDING, &oldFBO_);
-    
-    NSUInteger powW = ccNextPOT(w);
-    NSUInteger powH = ccNextPOT(h);
-    
-	GLuint						name_; // texture name
-    
-    glGenTextures(1, &name_);
-    glBindTexture(GL_TEXTURE_2D, name_);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) powW, (GLsizei) powH, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);//data);
-    
-    // create texture
-    texture_ = [[CCTexture2D alloc] initWithTextureName:name_ pixelFormat:kCCTexture2DPixelFormat_RGBA8888
-                                             pixelsWide:powW pixelsHigh:powH contentSize:CGSizeMake(w, h)];
-    
-    [texture_ setAliasTexParameters];
-    
-    // generate FBO
-    ccglGenFramebuffers(1, &fbo_);
-    ccglBindFramebuffer(CC_GL_FRAMEBUFFER, fbo_);
-    
-    // associate texture with FBO
-    ccglFramebufferTexture2D(CC_GL_FRAMEBUFFER, CC_GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, name_, 0);
-    
-    GLuint status = ccglCheckFramebufferStatus(CC_GL_FRAMEBUFFER);
-    if (status != CC_GL_FRAMEBUFFER_COMPLETE)
-    {
-        [NSException raise:@"Render Texture" format:@"Could not attach texture to framebuffer"];
-    }
-    
-    /* Create the MSAA framebuffer (offscreen) */
-    glGenFramebuffersOES(1, &msaaFramebuffer_);
-    glBindFramebufferOES(GL_FRAMEBUFFER_OES, msaaFramebuffer_);
-    
-    glGenRenderbuffersOES(1, &msaaColorbuffer_); // render buffer for color
-    glBindRenderbufferOES(GL_RENDERBUFFER_OES, msaaColorbuffer_);
-    glRenderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER_OES, 4, GL_RGBA8_OES, powW, powH);
-    glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES, GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, msaaColorbuffer_);
-    
-    status = glCheckFramebufferStatus(GL_FRAMEBUFFER) ;
-    if(status != GL_FRAMEBUFFER_COMPLETE) {
-        NSLog(@"failed to make complete framebuffer object %x", status);
-    }
-    
-    glBindFramebufferOES(GL_FRAMEBUFFER_OES, msaaFramebuffer_);
-    //*/
-    // draw the swf
-    
-    glPushMatrix();
+    [rt begin];
     
     if (swfSprite_) {
         swfSprite_->draw(frame_);
     } else {
         swf_->drawFrame(frame_);
     }
-    glPopMatrix();
     
-    ccglBindFramebuffer(CC_GL_FRAMEBUFFER, fbo_);
-    glBindFramebufferOES( GL_READ_FRAMEBUFFER_APPLE, msaaFramebuffer_ );
-    glResolveMultisampleFramebufferAPPLE();
+    [rt end];
     
-    GLenum attachments[] = {GL_DEPTH_ATTACHMENT_OES, GL_COLOR_ATTACHMENT0_OES, GL_STENCIL_ATTACHMENT_OES};
-    glDiscardFramebufferEXT(GL_READ_FRAMEBUFFER_APPLE, 3, attachments);
-    
-	ccglBindFramebuffer(CC_GL_FRAMEBUFFER, oldFBO_);
-    
-    ccglDeleteFramebuffers(1, &fbo_);
-    ccglDeleteFramebuffers(1, &msaaFramebuffer_);
-    glDeleteRenderbuffersOES(1, &msaaColorbuffer_);
-    
-    return texture_;
+    return rt.sprite.texture;
 }
 
 #pragma mark CCSpriteSWF - draw

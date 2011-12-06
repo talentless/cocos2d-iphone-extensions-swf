@@ -1,6 +1,6 @@
 //
 //  CCSpriteSWF.h
-//  MySampleApp
+//  CCSpriteFrameCache_SWF_Extension
 //
 //  Created by Salvatore Gionfriddo on 11/29/11.
 //  Copyright (c) 2011 Taco Graveyard. All rights reserved.
