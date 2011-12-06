@@ -57,7 +57,7 @@
 #pragma mark CCSpriteSWF - conversions
 
 -(CCSprite*) convertToSprite;
--(CCTexture2D*) convertToTexture;
+-(CCTexture2D*) renderToTexture;
 
 @end
 

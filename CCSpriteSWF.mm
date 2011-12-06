@@ -143,10 +143,10 @@ unsigned long ccNextPOT(unsigned long x)
 #pragma mark CCSpriteSWF - conversions
 
 -(CCSprite*) convertToSprite {
-    return [CCSprite spriteWithTexture:[self convertToTexture]];
+    return [CCSprite spriteWithTexture:[self renderToTexture]];
 }
 
--(CCTexture2D*) convertToTexture {
+-(CCTexture2D*) renderToTexture {
     int w = swf_->getFrameWidth();
     int h = swf_->getFrameHeight();
     
@@ -158,14 +158,11 @@ unsigned long ccNextPOT(unsigned long x)
     
     // new fbo
     GLuint			fbo_;
-	GLuint colorbuffer_;
     
     // multisampling buffers
 	GLuint msaaFramebuffer_;
 	GLuint msaaColorbuffer_;
     
-    
-    GLenum				pixelFormat_;
 	CCTexture2D*		texture_;
     
     glGetIntegerv(CC_GL_FRAMEBUFFER_BINDING, &oldFBO_);
