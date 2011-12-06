@@ -147,14 +147,19 @@ unsigned long ccNextPOT(unsigned long x)
 }
 
 -(CCTexture2D*) renderToTexture {
-    CCRenderMultisampledTexture * rt = [CCRenderMultisampledTexture renderTextureWithWidth:swf_->getFrameWidth()
-                                                                                    height:swf_->getFrameHeight()];
+    CCRenderMultisampledTexture * rt = [CCRenderMultisampledTexture
+                                        renderTextureWithWidth:(swf_->getFrameWidth() * self.scale)
+                                        height:(swf_->getFrameHeight() * self.scale)];
     
     [rt begin];
+
+    vgLoadIdentity();
+    vgRotate(self.rotation * -1.0f);
     
     if (swfSprite_) {
         swfSprite_->draw(frame_);
     } else {
+        swf_->setOffsetScale(self.scale);
         swf_->drawFrame(frame_);
     }
     
