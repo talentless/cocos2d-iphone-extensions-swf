@@ -27,6 +27,8 @@
     NSString * filenameMinusExtension = [filename substringToIndex:[filename length] - 4]; // assumes it ends in .swf
     
     for (int i = 0; i < totalFrames; i++) {
+        spriteSwf.displayFrame = i;
+        
         int width = spriteSwf.swf->getFrameWidth();
         int height = spriteSwf.swf->getFrameHeight();
         
