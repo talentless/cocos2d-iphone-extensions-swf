@@ -13,5 +13,6 @@
 
 -(void) addSpriteFramesWithSWF:(NSString*)filename;
 -(void) addSpriteFramesWithSWF:(NSString*)filename pixelFormat:(CCTexture2DPixelFormat)format;
+-(void) addSpriteFramesWithSWF:(NSString*)filename pixelFormat:(CCTexture2DPixelFormat)format formatString:(NSString*)formatString;
 
 @end
